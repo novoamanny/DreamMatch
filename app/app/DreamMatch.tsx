@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -6,6 +6,7 @@ import {
   ScrollView,
   Image,
   TouchableOpacity,
+  ActivityIndicator,
 } from 'react-native';
 import { useRoute, RouteProp, useNavigation } from '@react-navigation/native';
 
@@ -16,23 +17,60 @@ type RootStackParamList = {
 const ResultsScreen = () => {
   const route = useRoute<RouteProp<RootStackParamList, 'ResultsScreen'>>();
   const navigation = useNavigation();
-
   const { imageUri } = route.params;
 
-  // Dummy detected colors & matched products
-  const detectedColors = ['#5D3A00', '#C19A6B', '#F5DEB3'];
-  const matchedProducts = [
-    {
-      id: 'prod1',
-      name: 'Chestnut Brown Extensions',
-      image: 'https://i.imgur.com/4AI1hEL.jpg',
-    },
-    {
-      id: 'prod2',
-      name: 'Golden Blonde Extensions',
-      image: 'https://i.imgur.com/lkTnV0v.jpg',
-    },
-  ];
+  const [detectedColors, setDetectedColors] = useState<string[]>([]);
+  const [matchedProducts, setMatchedProducts] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const uploadImage = async () => {
+      try {
+        const formData = new FormData();
+        formData.append('file', {
+          uri: imageUri,
+          name: 'hair.jpg',
+          type: 'image/jpeg',
+        } as any);
+
+        const response = await fetch('http://192.168.4.198:3000/match?k=12', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+          body: formData,
+        });
+
+        const data = await response.json();
+
+        // Map API results to state
+        setDetectedColors(data.userHair.map((h: any) => h.hex));
+        // flatten topMatches and pick first for demo
+        const products: any[] = [];
+        data.topMatches.forEach((shades: any) => {
+          shades.forEach((ext: any) => {
+            products.push(ext);
+          });
+        });
+        setMatchedProducts(products);
+      } catch (err) {
+        console.error('Error uploading image:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    uploadImage();
+  }, [imageUri]);
+
+  if (loading) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', flex: 1 }]}>
+        <ActivityIndicator size="large" color="#EF84AE" />
+        <Text style={{ marginTop: 16, fontSize: 16, color: '#555' }}>Analyzing your hair...</Text>
+      </View>
+    );
+  }
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
@@ -62,6 +100,7 @@ const ResultsScreen = () => {
     </ScrollView>
   );
 };
+
 
 const styles = StyleSheet.create({
   container: {
